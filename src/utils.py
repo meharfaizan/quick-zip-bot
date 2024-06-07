@@ -38,7 +38,7 @@ async def download_files(
                 pass
             else:
                 start_time = time.time()
-                task = m.download(file_path=root / (m.document.file_name or 'no_name'))
+                task = m.download(file_name=str(root / (m.document.file_name or 'no_name')))
                 pending.add(task)
                 next_msg_index += 1
 
