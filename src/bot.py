@@ -4,6 +4,7 @@ from shutil import rmtree
 from pathlib import Path
 import logging
 import os
+import time
 
 from dotenv import load_dotenv
 from pyrogram import Client, filters
@@ -59,6 +60,7 @@ async def add_file_handler(client, message: Message):
     Stores the ID of messages sent with files by this user.
     """
     tasks[message.from_user.id].append(message.message_id)
+    await message.reply_text(f'File received: {message.document.file_name}')
 
 
 @bot.on_message(filters.command('zip'))
@@ -70,39 +72,50 @@ async def zip_handler(client, message: Message):
     user_id = message.from_user.id
     if user_id not in tasks:
         await message.reply_text('You must use /add first.')
-    elif not tasks[user_id]:
+        return
+
+    if not tasks[user_id]:
         await message.reply_text('You must send me some files first.')
-    else:
-        zip_name_match = message.text.split(' ', 1)
-        if len(zip_name_match) < 2:
-            await message.reply_text('You must provide a name for the zip file.')
-            return
+        return
 
-        zip_name = zip_name_match[1]
+    zip_name_match = message.text.split(' ', 1)
+    if len(zip_name_match) < 2:
+        await message.reply_text('You must provide a name for the zip file.')
+        return
 
-        messages = []
-        for msg_id in tasks[user_id]:
-            msg = await client.get_messages(chat_id=user_id, message_ids=msg_id)
-            messages.append(msg)
+    zip_name = zip_name_match[1]
+    messages = await client.get_messages(chat_id=user_id, message_ids=tasks[user_id])
+    zip_size = sum([msg.document.file_size for msg in messages])
 
-        zip_size = sum([msg.document.file_size for msg in messages])
+    if zip_size > 1024 * 1024 * 2000:  # zip_size > 1.95 GB approximately
+        await message.reply_text('Total filesize must not exceed 2.0 GB.')
+        return
 
-        if zip_size > 1024 * 1024 * 2000:  # zip_size > 1.95 GB approximately
-            await message.reply_text('Total filesize must not exceed 2.0 GB.')
-        else:
-            root = STORAGE / f'{user_id}/'
-            zip_file_name = root / (zip_name + '.zip')
+    root = STORAGE / f'{user_id}/'
+    zip_file_name = root / (zip_name + '.zip')
 
-            async for file in download_files(messages, CONC_MAX, root):
-                await get_running_loop().run_in_executor(
-                    None, partial(add_to_zip, zip_file_name, file))
+    # Inform the user about the start of the zipping process
+    progress_message = await message.reply_text('Starting to download and zip your files...')
 
-            await message.reply_document(zip_file_name)
+    try:
+        start_time = time.time()
+        async for file in download_files(messages, CONC_MAX, root, progress_message):
+            await get_running_loop().run_in_executor(None, partial(add_to_zip, zip_file_name, file))
+            await progress_message.edit_text(f'Zipping: {file.name}')
 
-            await get_running_loop().run_in_executor(
-                None, rmtree, STORAGE / str(user_id))
+        end_time = time.time()
+        duration = end_time - start_time
 
+        await message.reply_document(zip_file_name, caption=f'Done! Zipped in {duration:.2f} seconds.')
+
+    except Exception as e:
+        logging.error(f"Error while zipping files: {e}")
+        await message.reply_text(f'An error occurred: {e}')
+
+    finally:
+        await get_running_loop().run_in_executor(None, rmtree, STORAGE / str(user_id))
         tasks.pop(user_id)
+        await progress_message.delete()
 
 
 @bot.on_message(filters.command('cancel'))
