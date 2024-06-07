@@ -54,7 +54,7 @@ async def start_task_handler(client, message: Message):
     await message.reply_text('OK, send me some files.')
 
 
-@bot.on_message(filters.document & filters.create(lambda _, __, m: m.from_user.id in tasks))
+@bot.on_message(filters.document | filters.video | filters.audio | filters.photo & filters.create(lambda _, __, m: m.from_user.id in tasks))
 async def add_file_handler(client, message: Message):
     """
     Stores the ID of messages sent with files by this user.
