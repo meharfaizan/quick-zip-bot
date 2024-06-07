@@ -1,14 +1,13 @@
-from typing import Iterator
+from typing import Iterator, List
 from asyncio import wait
 from asyncio.tasks import FIRST_COMPLETED
 from zipfile import ZipFile
 from pathlib import Path
 
-from telethon.tl.custom import Message
-
+from pyrogram.types import Message
 
 async def download_files(
-    msgs: list[Message],
+    msgs: List[Message],
     conc_max: int = 3,
     root: Path | None = None
 ) -> Iterator[Path]:
@@ -35,14 +34,17 @@ async def download_files(
             except IndexError:
                 pass
             else:
-                pending.add(m.download_media(file=root / (m.file.name or 'no_name')))
+                pending.add(m.download(file_path=root / (m.document.file_name or 'no_name')))
                 next_msg_index += 1
         
         if pending:
             done, pending = await wait(pending, return_when=FIRST_COMPLETED)
 
-            if done and (path := await done.pop()) is not None:
-                yield Path(path)
+            if done:
+                for task in done:
+                    path = await task
+                    if path:
+                        yield Path(path)
 
 
 def add_to_zip(zip: Path, file: Path) -> None:
