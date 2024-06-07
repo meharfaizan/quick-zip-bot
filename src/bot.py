@@ -59,7 +59,7 @@ async def add_file_handler(client, message: Message):
     """
     Stores the ID of messages sent with files by this user.
     """
-    tasks[message.from_user.id].append(message.message_id)
+    tasks[message.from_user.id].append(message.id)
     await message.reply_text(f'File received: {message.document.file_name}')
 
 
