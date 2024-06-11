@@ -1,4 +1,5 @@
-﻿python-dotenv==0.19.2
-cryptg==0.2.post4
+﻿python-dotenv
+cryptg
 pyrogram
 tgcrypto
+aiofiles
