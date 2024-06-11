@@ -49,7 +49,7 @@ async def add_file_handler(client: Client, message: Message):
     Stores the ID of messages sent with files by this user.
     """
     if message.from_user.id in tasks:
-        tasks[message.from_user.id].append(message.message_id)
+        tasks[message.from_user.id].append(message.id)
 
 
 @bot.on_message(filters.command('zip'))
